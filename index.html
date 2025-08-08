@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="th" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Blood Detector · YOLO Inference UI</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans Thai', 'ui-sans-serif', 'system-ui']
+          },
+          colors: {
+            primary: {
+              50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc',
+              400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca',
+              800: '#3730a3', 900: '#312e81'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Hide default file input */
+    input[type="file"] { display: none; }
+    .dropzone.dragover { border-color: #6366f1; background: rgba(99,102,241,.08); }
+    .grid-cols-auto { grid-template-columns: 1fr auto; }
+  </style>
+</head>
+<body class="font-sans bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 min-h-screen">
+  <header class="px-4 sm:px-6 lg:px-8 py-5 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 backdrop-blur bg-white/70 dark:bg-zinc-900/70 z-10">
+    <div class="max-w-6xl mx-auto flex items-center gap-3">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-7 h-7 text-primary-500"><path d="M12 22c4.97-4.37 8-8.21 8-12a8 8 0 10-16 0c0 3.79 3.03 7.63 8 12z"/></svg>
+      <div class="flex-1">
+        <h1 class="text-xl font-semibold tracking-tight">Blood Detector · YOLO Inference UI</h1>
+        <p class="text-sm text-zinc-500 dark:text-zinc-400">อัปโหลดภาพ ตั้งค่าพารามิเตอร์ แล้วรับผลที่มีกรอบตรวจจับ</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="themeBtn" class="px-3 py-1.5 rounded-xl border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-sm">สว่าง/มืด</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
+    <!-- Params Card (Endpoint ถูกซ่อนจาก UI และล็อกในโค้ด) -->
+    <section class="bg-white dark:bg-zinc-950/60 rounded-2xl shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-800 p-5 mb-6">
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-3 gap-3 md:col-span-2">
+          <label class="block">
+            <span class="text-sm text-zinc-600 dark:text-zinc-400">conf</span>
+            <input id="conf" type="number" step="0.01" min="0" max="1" value="0.10"
+                   class="mt-1 w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2" />
+          </label>
+          <label class="block">
+            <span class="text-sm text-zinc-600 dark:text-zinc-400">iou</span>
+            <input id="iou" type="number" step="0.01" min="0" max="1" value="0.30"
+                   class="mt-1 w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2" />
+          </label>
+          <label class="block">
+            <span class="text-sm text-zinc-600 dark:text-zinc-400">imgsz</span>
+            <input id="imgsz" type="number" min="32" max="4096" value="1280"
+                   class="mt-1 w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2" />
+          </label>
+        </div>
+      </div>
+      <p class="mt-2 text-xs text-zinc-500">หมายเหตุ: ปลายทาง API ถูกล็อกในโค้ด (ไม่แสดงใน UI)</p>
+    </section>
+
+    <!-- Upload Card -->
+    <section class="bg-white dark:bg-zinc-950/60 rounded-2xl shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-800 p-5 mb-6">
+      <div class="grid md:grid-cols-2 gap-6">
+        <div>
+          <div id="dropzone" class="dropzone border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-10 h-10 text-zinc-400"><path d="M12 16l4-5h-3V4h-2v7H8l4 5z"/><path d="M20 18H4v2h16v-2z"/></svg>
+            <p class="mt-2 text-sm">วางรูปที่นี่ หรือ <span class="text-primary-500 underline">คลิกเพื่อเลือก</span></p>
+            <input id="fileInput" type="file" accept="image/*" />
+          </div>
+          <div class="mt-3 text-xs text-zinc-500">รองรับไฟล์ภาพทั่วไป (jpg/png/webp ฯลฯ)</div>
+        </div>
+        <div>
+          <div class="grid grid-cols-auto items-center gap-3">
+            <p class="text-sm font-medium">ภาพต้นฉบับ</p>
+            <button id="clearBtn" class="justify-self-end px-3 py-1.5 text-sm rounded-xl border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800">ล้างรูป</button>
+          </div>
+          <div class="mt-2 aspect-video bg-zinc-100 dark:bg-zinc-800 rounded-xl overflow-hidden flex items-center justify-center">
+            <img id="preview" class="max-h-full max-w-full" alt="preview" />
+            <span id="noPreview" class="text-zinc-400 text-sm">ยังไม่มีรูป</span>
+          </div>
+          <div class="mt-4 flex gap-3">
+            <button id="predictBtn" class="flex-1 px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-medium disabled:opacity-60 disabled:cursor-not-allowed">ทำนาย</button>
+            <button id="downloadBtn" class="px-4 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800" disabled>ดาวน์โหลดผล</button>
+          </div>
+          <p id="status" class="mt-3 text-sm text-zinc-500"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Result Card -->
+    <section class="bg-white dark:bg-zinc-950/60 rounded-2xl shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-800 p-5">
+      <div class="grid grid-cols-auto items-center gap-3 mb-2">
+        <p class="text-sm font-medium">ผลลัพธ์จาก API</p>
+        <div class="justify-self-end flex items-center gap-2 text-xs text-zinc-500">
+          <label class="flex items-center gap-2"><input id="fitContain" type="radio" name="fit" value="contain" checked>Contain</label>
+          <label class="flex items-center gap-2"><input id="fitCover" type="radio" name="fit" value="cover">Cover</label>
+        </div>
+      </div>
+      <div class="aspect-video bg-zinc-100 dark:bg-zinc-800 rounded-xl overflow-hidden flex items-center justify-center">
+        <img id="resultImg" class="max-h-full max-w-full object-contain" alt="result" />
+        <span id="noResult" class="text-zinc-400 text-sm">ยังไม่มีผลลัพธ์</span>
+      </div>
+    </section>
+  </main>
+
+  <footer class="max-w-6xl mx-auto p-6 text-xs text-zinc-500">
+    ทำด้วยใจ · ถ้าเบราว์เซอร์บล็อก CORS ให้เปิดจากโดเมนที่อนุญาต
+  </footer>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-sm bg-zinc-900 text-white/90 shadow-lg opacity-0 pointer-events-none transition-opacity"></div>
+
+  <script>
+    // ====== CONFIG (ล็อก Endpoint ตายตัว) ======
+    const API_ENDPOINT = "https://blood.ongor.fun/predict/image";
+
+    // ====== DOM ======
+    const $ = (id) => document.getElementById(id);
+    const dropzone = $("dropzone");
+    const fileInput = $("fileInput");
+    const preview = $("preview");
+    const noPreview = $("noPreview");
+    const resultImg = $("resultImg");
+    const noResult = $("noResult");
+    const predictBtn = $("predictBtn");
+    const downloadBtn = $("downloadBtn");
+    const statusEl = $("status");
+    const confEl = $("conf");
+    const iouEl = $("iou");
+    const imgszEl = $("imgsz");
+    const toastEl = $("toast");
+
+    // Theme toggle
+    $("themeBtn").onclick = () => {
+      document.documentElement.classList.toggle('dark');
+    };
+
+    // Fit mode toggle
+    const fitContain = $("fitContain");
+    const fitCover = $("fitCover");
+    function applyFit() {
+      resultImg.classList.toggle('object-contain', fitContain.checked);
+      resultImg.classList.toggle('object-cover', fitCover.checked);
+    }
+    fitContain.onchange = fitCover.onchange = applyFit;
+
+    // Dropzone logic
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+
+    let currentFile = null;
+    function setFile(file) {
+      currentFile = file;
+      const url = URL.createObjectURL(file);
+      preview.src = url; preview.onload = () => URL.revokeObjectURL(url);
+      preview.classList.remove('hidden');
+      noPreview.style.display = 'none';
+      noResult.style.display = 'block';
+      resultImg.removeAttribute('src');
+      downloadBtn.disabled = true;
+      statusEl.textContent = '';
+    }
+
+    $("clearBtn").onclick = () => {
+      currentFile = null;
+      fileInput.value = '';
+      preview.removeAttribute('src');
+      noPreview.style.display = 'block';
+      resultImg.removeAttribute('src');
+      noResult.style.display = 'block';
+      downloadBtn.disabled = true;
+      statusEl.textContent = '';
+    };
+
+    function toast(msg) {
+      toastEl.textContent = msg;
+      toastEl.style.opacity = 1;
+      setTimeout(() => toastEl.style.opacity = 0, 2200);
+    }
+
+    async function predict() {
+      if (!currentFile) {
+        alert('กรุณาเลือกรูปก่อน');
+        return;
+      }
+      const qs = new URLSearchParams({
+        conf: confEl.value || '0.10',
+        iou: iouEl.value || '0.30',
+        imgsz: imgszEl.value || '1280',
+      });
+      const url = `${API_ENDPOINT}?${qs.toString()}`;
+
+      const form = new FormData();
+      form.append('file', currentFile, currentFile.name || 'image.jpg');
+
+      predictBtn.disabled = true;
+      statusEl.textContent = '⏳ กำลังส่งไปยัง API...';
+
+      try {
+        const res = await fetch(url, { method: 'POST', body: form });
+        if (!res.ok) throw new Error(`API error ${res.status}`);
+        const blob = await res.blob();
+        const imgUrl = URL.createObjectURL(blob);
+        resultImg.src = imgUrl;
+        noResult.style.display = 'none';
+        downloadBtn.disabled = false;
+        downloadBtn.onclick = () => {
+          const a = document.createElement('a');
+          a.href = imgUrl; a.download = 'prediction.png'; a.click();
+        };
+        statusEl.textContent = '✅ เสร็จแล้ว';
+        toast('ทำนายสำเร็จ');
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = '❌ เรียก API ไม่สำเร็จ - อาจติด CORS หรือเซิร์ฟเวอร์ล่ม';
+        toast('เกิดข้อผิดพลาดในการเรียก API');
+        alert(err.message);
+      } finally {
+        predictBtn.disabled = false;
+      }
+    }
+
+    predictBtn.onclick = predict;
+
+    // Initial state
+    preview.classList.add('hidden');
+    applyFit();
+  </script>
+</body>
+</html>
